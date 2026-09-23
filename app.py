@@ -1,7 +1,7 @@
 import os
 import smtplib
 from email.message import EmailMessage
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
@@ -9,17 +9,17 @@ app = Flask(__name__)
 def home():
     return render_template('index.html')
 
+@app.route('/send-emails', methods=['POST'])
 @app.route('/api/send-emails', methods=['POST'])
 def send_emails():
-    # Safely retrieve credentials from cloud environment variables
     sender_email = os.environ.get('SENDER_EMAIL')
     app_password = os.environ.get('APP_PASSWORD')
 
     if not sender_email or not app_password:
-        return jsonify({'success': False, 'error': 'Server credentials not configured'}), 500
+        return jsonify({'success': False, 'error': 'Server credentials missing.'}), 500
 
-    data = request.json
-   contacts = data.get('contacts', [])
+    data = request.json or {}
+    contacts = data.get('contacts', [])
     subject = data.get('subject', 'Notification')
     template = data.get('template', '')
 
@@ -52,4 +52,4 @@ def send_emails():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
