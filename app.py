@@ -24,7 +24,7 @@ def send_emails():
     template = data.get('template', '')
 
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+       server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
         server.starttls()
         server.login(sender_email, app_password)
 
