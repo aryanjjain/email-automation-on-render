@@ -1,15 +1,7 @@
 import os
-import socket
-import smtplib
-from email.message import EmailMessage
+import json
+import urllib.request
 from flask import Flask, render_template, request, jsonify
-
-# Force Python socket to resolve IPv4 addresses only
-old_getaddrinfo = socket.getaddrinfo
-def new_getaddrinfo(*args, **kwargs):
-    responses = old_getaddrinfo(*args, **kwargs)
-    return [res for res in responses if res[0] == socket.AF_INET]
-socket.getaddrinfo = new_getaddrinfo
 
 app = Flask(__name__)
 
@@ -20,44 +12,56 @@ def home():
 @app.route('/send-emails', methods=['POST'])
 @app.route('/api/send-emails', methods=['POST'])
 def send_emails():
-    sender_email = os.environ.get('SENDER_EMAIL')
-    app_password = os.environ.get('APP_PASSWORD')
+    api_key = os.environ.get('RESEND_API_KEY')
 
-    if not sender_email or not app_password:
-        return jsonify({'success': False, 'error': 'Server credentials missing.'}), 500
+    if not api_key:
+        return jsonify({'success': False, 'error': 'RESEND_API_KEY missing in Render Environment.'}), 500
 
     data = request.json or {}
     contacts = data.get('contacts', [])
     subject = data.get('subject', 'Notification')
     template = data.get('template', '')
 
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
-        server.starttls()
-        server.login(sender_email, app_password)
+    sent_count = 0
+    error_msg = None
 
-        sent_count = 0
-        for contact in contacts:
-            name = contact.get('Name') or contact.get('name') or ''
-            email = contact.get('Email') or contact.get('email') or ''
+    for contact in contacts:
+        name = contact.get('Name') or contact.get('name') or ''
+        email = contact.get('Email') or contact.get('email') or ''
 
-            if not email:
-                continue
+        if not email:
+            continue
 
-            msg = EmailMessage()
-            msg['Subject'] = subject
-            msg['From'] = sender_email
-            msg['To'] = email
-            msg.set_content(template.replace('[Name]', name))
+        content = template.replace('[Name]', name)
 
-            server.send_message(msg)
-            sent_count += 1
+        payload = json.dumps({
+            "from": "onboarding@resend.dev",
+            "to": [email],
+            "subject": subject,
+            "html": f"<p>{content}</p>"
+        }).encode('utf-8')
 
-        server.quit()
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                if response.status in (200, 201):
+                    sent_count += 1
+        except Exception as e:
+            error_msg = str(e)
+
+    if sent_count > 0:
         return jsonify({'success': True, 'count': sent_count})
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        return jsonify({'success': False, 'error': error_msg or 'Failed to send email via API.'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
