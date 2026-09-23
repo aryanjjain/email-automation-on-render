@@ -1,7 +1,15 @@
 import os
+import socket
 import smtplib
 from email.message import EmailMessage
 from flask import Flask, render_template, request, jsonify
+
+# Force Python socket to resolve IPv4 addresses only
+old_getaddrinfo = socket.getaddrinfo
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [res for res in responses if res[0] == socket.AF_INET]
+socket.getaddrinfo = new_getaddrinfo
 
 app = Flask(__name__)
 
