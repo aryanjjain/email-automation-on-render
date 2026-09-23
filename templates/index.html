@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailPulse Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 font-sans">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="border-b border-slate-700 pb-4">
+            <h1 class="text-3xl font-bold text-indigo-400">MailPulse Studio</h1>
+            <p class="text-slate-400 text-sm mt-1">Bulk Email Automation Control Panel</p>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Email Content Editor -->
+            <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+                <h2 class="text-lg font-semibold text-slate-200">1. Email Content</h2>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Subject Line</label>
+                    <input type="text" id="subject" placeholder="Important Update From Our Team" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Message Template (Use <code class="text-indigo-400">[Name]</code> for recipient names)</label>
+                    <textarea id="template" rows="8" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500" placeholder="Hi [Name],&#10;&#10;I hope this email finds you well..."></textarea>
+                </div>
+            </div>
+
+            <!-- Recipients & Action -->
+            <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-200">2. Recipients (CSV Data)</h2>
+                    <p class="text-xs text-slate-400 mb-2">Paste contact list below (Header line required: <code>Name,Email</code>):</p>
+                    <textarea id="csvData" rows="8" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500" placeholder="Name,Email&#10;Alex Johnson,alex@example.com&#10;Priya Sharma,priya@example.com"></textarea>
+                </div>
+                
+                <button id="sendBtn" onclick="sendEmails()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors flex justify-center items-center gap-2">
+                    🚀 Send Emails
+                </button>
+            </div>
+        </div>
+
+        <!-- Activity Log Console -->
+        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+            <h2 class="text-sm font-semibold text-slate-300 mb-2">Activity Log</h2>
+            <div id="statusLog" class="bg-slate-950 p-3 rounded-lg font-mono text-xs text-slate-400 h-28 overflow-y-auto space-y-1">
+                <div>Ready. Enter content and recipient CSV data, then click 'Send Emails'.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function sendEmails() {
+            const subject = document.getElementById('subject').value.trim();
+            const template = document.getElementById('template').value.trim();
+            const csvData = document.getElementById('csvData').value.trim();
+            const statusLog = document.getElementById('statusLog');
+            const sendBtn = document.getElementById('sendBtn');
+
+            if (!subject || !template || !csvData) {
+                log('❌ Please fill in the Subject, Message Template, and Recipients CSV.');
+                return;
+            }
+
+            // Parse raw CSV input
+            const lines = csvData.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length < 2) {
+                log('❌ CSV must contain a header row (Name,Email) and at least one recipient.');
+                return;
+            }
+
+            const contacts = [];
+            for (let i = 1; i < lines.length; i++) {
+                const parts = lines[i].split(',').map(p => p.trim());
+                if (parts.length >= 2) {
+                    contacts.push({ Name: parts[0], Email: parts[1] });
+                }
+            }
+
+            if (contacts.length === 0) {
+                log('❌ Could not parse valid contact rows from the CSV data.');
+                return;
+            }
+
+            log(`⌛ Dispatching request to server for ${contacts.length} recipient(s)...`);
+            sendBtn.disabled = true;
+            sendBtn.innerText = 'Sending...';
+
+            try {
+                const response = await fetch('/api/send-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, template, contacts })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    log(`✅ Finished! ${result.count} email(s) successfully sent.`);
+                } else {
+                    log(`❌ Server Error: ${result.error || 'Failed to send emails.'}`);
+                }
+            } catch (error) {
+                log(`❌ Connection Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.innerText = '🚀 Send Emails';
+            }
+        }
+
+        function log(msg) {
+            const statusLog = document.getElementById('statusLog');
+            const entry = document.createElement('div');
+            entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            statusLog.appendChild(entry);
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+    </script>
+</body>
+</html>
