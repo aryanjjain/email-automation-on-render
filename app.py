@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import urllib.error
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
@@ -36,7 +37,7 @@ def send_emails():
 
         payload = json.dumps({
             "from": "onboarding@resend.dev",
-            "to": [email],
+            "to": [email.strip()],
             "subject": subject,
             "html": f"<p>{content}</p>"
         }).encode('utf-8')
@@ -45,8 +46,9 @@ def send_emails():
             "https://api.resend.com/emails",
             data=payload,
             headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
+                "Authorization": f"Bearer {api_key.strip()}",
+                "Content-Type": "application/json",
+                "User-Agent": "MailPulseApp/1.0"
             },
             method="POST"
         )
@@ -55,6 +57,13 @@ def send_emails():
             with urllib.request.urlopen(req) as response:
                 if response.status in (200, 201):
                     sent_count += 1
+        except urllib.error.HTTPError as e:
+            try:
+                err_body = e.read().decode('utf-8')
+                err_json = json.loads(err_body)
+                error_msg = err_json.get('message', err_body)
+            except Exception:
+                error_msg = f"HTTP {e.code}: {e.reason}"
         except Exception as e:
             error_msg = str(e)
 
