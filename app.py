@@ -19,12 +19,12 @@ def send_emails():
         return jsonify({'success': False, 'error': 'Server credentials not configured'}), 500
 
     data = request.json
-    contacts = data.get('contacts', [])
+   contacts = data.get('contacts', [])
     subject = data.get('subject', 'Notification')
     template = data.get('template', '')
 
     try:
-       server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
         server.starttls()
         server.login(sender_email, app_password)
 
